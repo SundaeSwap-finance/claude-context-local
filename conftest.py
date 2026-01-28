@@ -67,12 +67,12 @@ class EmbeddingModelMock:
         """Initialize mock model."""
         self.cache_dir = cache_dir
         self.device = device
-        self.model_name = "google/embeddinggemma-300m"
+        self.model_name = "nomic-ai/nomic-embed-text-v1.5"
         self.rng = np.random.RandomState(42)  # Deterministic seed for reproducible tests
 
     def encode(self, texts, **kwargs):
         """Return mock embeddings."""
-        # Return 768-dimensional embeddings (matching EmbeddingGemma)
+        # Return 768-dimensional embeddings (matching nomic-embed-text-v1.5)
         # Use deterministic seed for reproducible tests
         return self.rng.randn(len(texts), 768).astype(np.float32)
 
@@ -112,7 +112,7 @@ def pytest_configure(config):
     # Patch AVAILABLE_MODELS with mock for integration tests
     try:
         from embeddings import embedding_models_register
-        embedding_models_register.AVAILIABLE_MODELS["google/embeddinggemma-300m"] = EmbeddingModelMock
+        embedding_models_register.AVAILIABLE_MODELS["nomic-ai/nomic-embed-text-v1.5"] = EmbeddingModelMock
     except ImportError:
         pass
 
@@ -228,7 +228,7 @@ def mock_storage_dir(tmp_path: Path) -> Path:
 def test_config():
     """Test configuration settings."""
     return {
-        'embedding_model': 'google/embeddinggemma-300m',
+        'embedding_model': 'nomic-ai/nomic-embed-text-v1.5',
         'test_batch_size': 2,  # Small batch size for tests
         'test_timeout': 30,    # Timeout for tests
         'mock_embeddings': False,  # Use real embeddings if available

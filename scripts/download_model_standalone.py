@@ -13,7 +13,7 @@ except ImportError:
     sys.exit(1)
 
 
-def download_model(model_name: str = "google/embeddinggemma-300m", storage_dir: str = None):
+def download_model(model_name: str = "nomic-ai/nomic-embed-text-v1.5", storage_dir: str = None):
     """Download the embedding model."""
     if storage_dir is None:
         storage_dir = os.path.expanduser("~/.claude_code_search")
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download embedding model for testing")
     parser.add_argument(
         "--model", 
-        default="google/embeddinggemma-300m",
+        default="nomic-ai/nomic-embed-text-v1.5",
         help="Model name to download"
     )
     parser.add_argument(

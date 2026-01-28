@@ -1,4 +1,4 @@
-"""Code embedding wrapper using EmbeddingGemma model."""
+"""Code embedding wrapper using sentence transformer models."""
 
 import logging
 from typing import List, Optional, Dict, Any
@@ -19,7 +19,7 @@ class EmbeddingResult:
 
 
 class CodeEmbedder:
-    """Wrapper for embedding code chunks using an open-source equivilent to EmbeddingGemma model."""
+    """Wrapper for embedding code chunks using sentence transformer models."""
 
     def __init__(
         self,
