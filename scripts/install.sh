@@ -119,7 +119,11 @@ else
   )
 fi
 
-# 6) Download embedding model (nomic-embed-text - no auth required)
+# 6) Install additional dependencies for nomic model
+print "Installing additional dependencies for nomic-embed-text..."
+(cd "${PROJECT_DIR}" && uv add einops)
+
+# 7) Download embedding model (nomic-embed-text - no auth required)
 print "Downloading embedding model: ${MODEL_NAME}"
 mkdir -p "${STORAGE_DIR}"
 
