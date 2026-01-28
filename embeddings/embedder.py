@@ -19,11 +19,11 @@ class EmbeddingResult:
 
 
 class CodeEmbedder:
-    """Wrapper for embedding code chunks using EmbeddingGemma model."""
+    """Wrapper for embedding code chunks using an open-source equivilent to EmbeddingGemma model."""
 
     def __init__(
         self,
-        model_name: str = "google/embeddinggemma-300m",
+        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
         cache_dir: Optional[str] = None,
         device: str = "auto"
     ):
