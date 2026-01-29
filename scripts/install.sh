@@ -172,8 +172,20 @@ if [[ "${IS_UPDATE}" -eq 1 ]]; then
   printf "${BOLD}4) Then in Claude Code:${NC}\n"
   printf "   ${BLUE}index this codebase${NC}\n\n"
 
-  printf "${BOLD}5) Add to your project's CLAUDE.md:${NC}\n"
-  printf "   Add the code search preferences snippet shown below\n\n"
+  printf "${BOLD}5) Add this to your project's CLAUDE.md:${NC}\n"
+  cat << 'CLAUDEMD'
+```md
+# Code Search Preferences
+
+Use the code-search MCP server to minimize token usage:
+
+1. **ALWAYS use `mcp__code-search__search_code` first** - semantic search returns only relevant snippets
+2. **Avoid Grep/Glob** - they often lead to reading entire files to understand context
+3. **Only use Read** for specific lines when code-search snippets aren't sufficient
+4. Trust code-search results - don't redundantly re-read files it already found
+```
+CLAUDEMD
+  printf "\n"
 
   printf "${YELLOW}💡 Notes:${NC}\n"
   printf "%s\n" "• Your embeddings and indexed projects are preserved"
@@ -196,16 +208,9 @@ else
   
   printf "${BOLD}3) Then in Claude Code:${NC}\n"
   printf "   ${BLUE}index this codebase${NC}\n\n"
-  
-  printf "${YELLOW}💡 Notes:${NC}\n"
-  printf "%s\n" "• No authentication required (using nomic-embed-text)"
-  printf "%s\n" "• To update later, re-run this installer"
-  printf "%s\n" "• Your embeddings will be stored in ${STORAGE_DIR}"
-fi
 
-hr
-printf "${YELLOW}${BOLD}📝 Make sure you update your claude.md file!${NC}\n\n"
-cat << 'CLAUDEMD'
+  printf "${BOLD}4) Add this to your project's CLAUDE.md:${NC}\n"
+  cat << 'CLAUDEMD'
 ```md
 # Code Search Preferences
 
@@ -217,3 +222,10 @@ Use the code-search MCP server to minimize token usage:
 4. Trust code-search results - don't redundantly re-read files it already found
 ```
 CLAUDEMD
+  printf "\n"
+
+  printf "${YELLOW}💡 Notes:${NC}\n"
+  printf "%s\n" "• No authentication required (using nomic-embed-text)"
+  printf "%s\n" "• To update later, re-run this installer"
+  printf "%s\n" "• Your embeddings will be stored in ${STORAGE_DIR}"
+fi
