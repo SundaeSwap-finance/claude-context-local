@@ -30,3 +30,7 @@ Use the code-search MCP server to minimize token usage:
 3. **Only use Read** for specific lines when code-search snippets aren't sufficient
 4. Trust code-search results - don't redundantly re-read files it already found
 ```
+
+# Updating
+
+Just run the single-line script again.
