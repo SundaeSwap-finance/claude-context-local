@@ -120,7 +120,7 @@ class CodeEmbedder:
         # Encode using model with proper prompt
         embedding = self._model.encode(
             [content],
-            prompt_name="Retrieval-document",
+            prompt_name="document",
             show_progress_bar=False
         )[0]
 
@@ -175,7 +175,7 @@ class CodeEmbedder:
             # Generate embeddings for batch
             batch_embeddings = self._model.encode(
                 batch_contents,
-                prompt_name="Retrieval-document",
+                prompt_name="document",
                 show_progress_bar=False
             )
 
@@ -225,7 +225,7 @@ class CodeEmbedder:
         """
         embedding = self._model.encode(
             [query],
-            prompt_name="InstructionRetrieval",
+            prompt_name="query",
             show_progress_bar=False
         )[0]
         return embedding

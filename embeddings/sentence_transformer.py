@@ -57,7 +57,8 @@ class SentenceTransformerModel(EmbeddingModel):
             model = SentenceTransformer(
                 model_source,
                 cache_folder=self.cache_dir,
-                device=self._device
+                device=self._device,
+                trust_remote_code=True
             )
             self._logger.info(f"Model loaded successfully on device: {model.device}")
             self._model_loaded = True
@@ -112,8 +113,24 @@ class SentenceTransformerModel(EmbeddingModel):
         except Exception as e:
             self._logger.warning(f"Error during model cleanup: {e}")
 
+    def _has_model_weights(self, directory: Path) -> bool:
+        """Check if directory contains model weights."""
+        weights_files = ['model.safetensors', 'pytorch_model.bin']
+        for weights_file in weights_files:
+            weights_path = directory / weights_file
+            # Check if file exists and is not empty (symlinks are ok)
+            if weights_path.exists():
+                try:
+                    # Resolve symlinks and check file size
+                    resolved = weights_path.resolve()
+                    if resolved.exists() and resolved.stat().st_size > 0:
+                        return True
+                except Exception:
+                    pass
+        return False
+
     def _is_model_cached(self) -> bool:
-        """Check if model is cached locally."""
+        """Check if model is cached locally with weights."""
         if not self.cache_dir:
             return False
         try:
@@ -122,19 +139,15 @@ class SentenceTransformerModel(EmbeddingModel):
             if not cache_root.exists():
                 return False
             for path in cache_root.rglob('config_sentence_transformers.json'):
-                parent_str = str(path.parent).lower()
-                if model_key in parent_str:
+                parent = path.parent
+                if model_key in str(parent).lower() and self._has_model_weights(parent):
                     return True
-            for d in cache_root.glob('**/*'):
-                if d.is_dir() and model_key in d.name.lower():
-                    if (d / 'config_sentence_transformers.json').exists() or (d / 'README.md').exists():
-                        return True
         except Exception:
             return False
         return False
 
-    def _find_local_model_dir(self) -> Optional[str]:
-        """Locate the cached model directory."""
+    def _find_local_model_dir(self) -> Optional[Path]:
+        """Locate the cached model directory with weights."""
         if not self.cache_dir:
             return None
         try:
@@ -144,9 +157,8 @@ class SentenceTransformerModel(EmbeddingModel):
                 return None
             for path in cache_root.rglob('config_sentence_transformers.json'):
                 parent = path.parent
-                if model_key in str(parent).lower():
+                if model_key in str(parent).lower() and self._has_model_weights(parent):
                     return parent
-            candidates = [d for d in cache_root.glob('**/*') if d.is_dir() and model_key in d.name.lower()]
-            return candidates[0] if candidates else None
+            return None
         except Exception:
             return None
