@@ -1,6 +1,6 @@
 # Claude Context Local
 
-Forks the official [Claude Context Local]() repository and switches out EmbeddingGemma (which requires account and registration) for an open-source alternative: [nomic-embed-text-v1]().
+Forks the official [Claude Context Local](https://github.com/FarhanAliRaza/claude-context-local) repository and switches out EmbeddingGemma (which requires account and registration) for an open-source alternative: [nomic-embed-text-v1](https://huggingface.co/nomic-ai/nomic-embed-text-v1).
 
 ## Motivation
 
