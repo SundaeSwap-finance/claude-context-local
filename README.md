@@ -18,7 +18,7 @@ Single-line installation script:
 
 - `curl -fsSL https://raw.githubusercontent.com/SundaeSwap-finance/claude-context-local/main/scripts/install.sh | bash`
 
-After installing, ensure you add this to your `claude.md` file:
+After installing, add this to your global `~/.claude/CLAUDE.md` file (so it applies to all projects):
 
 ```md
 # Code Search Preferences

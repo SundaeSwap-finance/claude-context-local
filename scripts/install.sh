@@ -172,7 +172,7 @@ if [[ "${IS_UPDATE}" -eq 1 ]]; then
   printf "${BOLD}4) Then in Claude Code:${NC}\n"
   printf "   ${BLUE}index this codebase${NC}\n\n"
 
-  printf "${BOLD}5) Add this to your project's CLAUDE.md:${NC}\n"
+  printf "${BOLD}5) Add this to your global ~/.claude/CLAUDE.md (applies to all projects):${NC}\n"
   cat << 'CLAUDEMD'
 ```md
 # Code Search Preferences
@@ -209,7 +209,7 @@ else
   printf "${BOLD}3) Then in Claude Code:${NC}\n"
   printf "   ${BLUE}index this codebase${NC}\n\n"
 
-  printf "${BOLD}4) Add this to your project's CLAUDE.md:${NC}\n"
+  printf "${BOLD}4) Add this to your global ~/.claude/CLAUDE.md (applies to all projects):${NC}\n"
   cat << 'CLAUDEMD'
 ```md
 # Code Search Preferences
