@@ -171,7 +171,10 @@ if [[ "${IS_UPDATE}" -eq 1 ]]; then
   
   printf "${BOLD}4) Then in Claude Code:${NC}\n"
   printf "   ${BLUE}index this codebase${NC}\n\n"
-  
+
+  printf "${BOLD}5) Add to your project's CLAUDE.md:${NC}\n"
+  printf "   Add the code search preferences snippet shown below\n\n"
+
   printf "${YELLOW}💡 Notes:${NC}\n"
   printf "%s\n" "• Your embeddings and indexed projects are preserved"
   printf "%s\n" "• Only the code was updated; your data remains intact"
