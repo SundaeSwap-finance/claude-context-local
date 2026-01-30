@@ -17,6 +17,7 @@ A decent GPU (or CPU as a fallback) with enough RAM (32GB+) to handle model cont
 Single-line installation script:
 
 - `curl -fsSL https://raw.githubusercontent.com/SundaeSwap-finance/claude-context-local/main/scripts/install.sh | bash`
+- You can optionally add a --branch flag to install changes on a branch.
 
 After installing, add this to your global `~/.claude/CLAUDE.md` file (so it applies to all projects):
 
