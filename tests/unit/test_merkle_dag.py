@@ -135,7 +135,7 @@ class TestMerkleDAG(TestCase):
         data = dag1.to_dict()
 
         # Verify structure
-        assert data['root_path'] == str(self.test_path)
+        assert Path(data['root_path']).resolve() == self.test_path.resolve()
         assert data['root_node'] is not None
         assert data['file_count'] == 4
         assert data['total_size'] > 0

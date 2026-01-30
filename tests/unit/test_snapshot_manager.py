@@ -71,7 +71,7 @@ class TestSnapshotManager(TestCase):
         assert metadata is not None
         assert metadata['version'] == '1.0'
         assert metadata['author'] == 'test'
-        assert metadata['project_path'] == str(self.test_path)
+        assert Path(metadata['project_path']).resolve() == self.test_path.resolve()
         assert metadata['file_count'] == 1
 
     def test_snapshot_existence_check(self):

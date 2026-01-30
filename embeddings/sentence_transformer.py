@@ -102,13 +102,31 @@ class SentenceTransformerModel(EmbeddingModel):
             return
 
         try:
-            model = self.model
-            model.to('cpu')
+            model = self.__dict__.get("model")
+            if model is None:
+                self._model_loaded = False
+                return
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            try:
+                model.to('cpu')
+            except Exception:
+                pass
+
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+            try:
+                if hasattr(torch, "mps"):
+                    torch.mps.empty_cache()
+            except Exception:
+                pass
 
             del model
+            self.__dict__.pop("model", None)
+            self._model_loaded = False
             self._logger.info("Model cleaned up and memory freed")
         except Exception as e:
             self._logger.warning(f"Error during model cleanup: {e}")

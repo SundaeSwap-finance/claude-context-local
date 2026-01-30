@@ -96,7 +96,7 @@ def main():
         
         # Chunk the codebase
         logger.info("Parsing and chunking Python files...")
-        chunks = chunker.chunk_directory()
+        chunks = chunker.chunk_directory(str(directory_path))
         
         if not chunks:
             logger.error("No Python files found or no chunks extracted")
@@ -143,6 +143,8 @@ def main():
         logger.info(f"Files processed: {stats['files_indexed']}")
         logger.info(f"Embedding dimension: {stats['embedding_dimension']}")
         logger.info(f"Index type: {stats['index_type']}")
+        if stats.get('vector_backend'):
+            logger.info(f"Vector backend: {stats['vector_backend']}")
         logger.info(f"Model: {model_info['model_name']}")
         
         if stats.get('chunk_types'):
@@ -165,6 +167,15 @@ def main():
     except Exception as e:
         logger.error(f"Indexing failed: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        try:
+            embedder.cleanup()
+        except Exception:
+            pass
+        try:
+            index_manager.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

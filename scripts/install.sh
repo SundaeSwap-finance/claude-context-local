@@ -90,10 +90,14 @@ else
   print "Skipping dependency update (keeping current version)"
 fi
 
-# 5) Prefer FAISS GPU wheels on NVIDIA machines
+# 5) Prefer FAISS GPU wheels on NVIDIA machines (Linux/Windows)
 if [[ "${SKIP_GPU:-0}" == "1" ]]; then
   print "Skipping GPU detection (SKIP_GPU=1). Using faiss-cpu."
 else
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    print "Apple Silicon detected: embeddings can use MPS; vector search uses MPS by default when available."
+    print "You can override with CODE_SEARCH_VECTOR_BACKEND=faiss for CPU-only search."
+  fi
   print "Checking for NVIDIA GPU to install FAISS GPU wheels (optional)"
   (
     set +e

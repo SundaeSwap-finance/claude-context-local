@@ -1,23 +1,21 @@
 """Vector index management with FAISS and metadata storage."""
 
-import os
 import json
 import pickle
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import asdict
 import numpy as np
-import faiss
 from sqlitedict import SqliteDict
 from embeddings.embedder import EmbeddingResult
 from chunking.code_chunk import CodeChunk
+from search.vector_backends import FaissVectorIndex, MpsVectorIndex, resolve_vector_backend
 
 
 class CodeIndexManager:
-    """Manages FAISS vector index and metadata storage for code chunks."""
+    """Manages vector index backend and metadata storage for code chunks."""
     
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str, backend: Optional[str] = None):
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         
@@ -26,13 +24,14 @@ class CodeIndexManager:
         self.metadata_path = self.storage_dir / "metadata.db" 
         self.chunk_id_path = self.storage_dir / "chunk_ids.pkl"
         self.stats_path = self.storage_dir / "stats.json"
+        self.index_meta_path = self.storage_dir / "index_meta.json"
         
         # Initialize components
         self._index = None
         self._metadata_db = None
         self._chunk_ids = []
         self._logger = logging.getLogger(__name__)
-        self._on_gpu = False
+        self._backend_name, self._backend_explicit = resolve_vector_backend(backend)
         
     @property
     def index(self):
@@ -53,17 +52,29 @@ class CodeIndexManager:
         return self._metadata_db
     
     def _load_index(self):
-        """Load existing FAISS index or create new one."""
+        """Load existing vector index or create new one."""
         if self.index_path.exists():
             self._logger.info(f"Loading existing index from {self.index_path}")
-            self._index = faiss.read_index(str(self.index_path))
-            # If GPU support is available, optionally move to GPU for runtime speed
-            self._maybe_move_index_to_gpu()
+            preferred_backend = self._resolve_backend_for_existing_index()
+            self._index = self._try_load_index(preferred_backend)
+
+            if self._index is None:
+                fallback_backend = "faiss" if preferred_backend == "mps" else "mps"
+                self._logger.warning(
+                    f"Failed to load index with backend '{preferred_backend}'. "
+                    f"Attempting fallback backend '{fallback_backend}'."
+                )
+                self._index = self._try_load_index(fallback_backend)
+                if self._index is not None:
+                    self._backend_name = fallback_backend
             
             # Load chunk IDs
             if self.chunk_id_path.exists():
                 with open(self.chunk_id_path, 'rb') as f:
                     self._chunk_ids = pickle.load(f)
+            if self._index is None:
+                self._logger.warning("Index file could not be loaded; resetting chunk IDs.")
+                self._chunk_ids = []
         else:
             self._logger.info("Creating new index")
             # Create a new index - we'll initialize it when we get the first embedding
@@ -71,20 +82,20 @@ class CodeIndexManager:
             self._chunk_ids = []
     
     def create_index(self, embedding_dimension: int, index_type: str = "flat"):
-        """Create a new FAISS index."""
-        if index_type == "flat":
-            # Simple flat index for exact search
-            self._index = faiss.IndexFlatIP(embedding_dimension)  # Inner product (cosine similarity)
-        elif index_type == "ivf":
-            # IVF index for faster approximate search on large datasets
-            quantizer = faiss.IndexFlatIP(embedding_dimension)
-            n_centroids = min(100, max(10, embedding_dimension // 8))  # Adaptive number of centroids
-            self._index = faiss.IndexIVFFlat(quantizer, embedding_dimension, n_centroids)
+        """Create a new vector index."""
+        if self._backend_name == "mps":
+            try:
+                self._index = MpsVectorIndex.create(embedding_dimension, device="mps")
+                self._logger.info(f"Created MPS index with dimension {embedding_dimension}")
+            except Exception as exc:
+                self._logger.warning(f"Failed to create MPS index, falling back to FAISS: {exc}")
+                self._backend_name = "faiss"
+                self._index = FaissVectorIndex.create(embedding_dimension, index_type=index_type)
+                self._logger.info(f"Created {index_type} FAISS index with dimension {embedding_dimension}")
         else:
-            raise ValueError(f"Unsupported index type: {index_type}")
-        
-        self._logger.info(f"Created {index_type} index with dimension {embedding_dimension}")
-        self._maybe_move_index_to_gpu()
+            self._index = FaissVectorIndex.create(embedding_dimension, index_type=index_type)
+            self._logger.info(f"Created {index_type} FAISS index with dimension {embedding_dimension}")
+        self._write_index_meta()
     
     def add_embeddings(self, embedding_results: List[EmbeddingResult]) -> None:
         """Add embeddings to the index and metadata to the database."""
@@ -99,17 +110,12 @@ class CodeIndexManager:
             self.create_index(embedding_dim, index_type)
         
         # Prepare embeddings and metadata
-        embeddings = np.array([result.embedding for result in embedding_results])
+        embeddings = np.array([result.embedding for result in embedding_results], dtype=np.float32)
         
         # Normalize embeddings for cosine similarity
-        faiss.normalize_L2(embeddings)
+        embeddings = self._normalize_embeddings(embeddings)
         
-        # Train IVF index if needed
-        if hasattr(self._index, 'is_trained') and not self._index.is_trained:
-            self._logger.info("Training IVF index...")
-            self._index.train(embeddings)
-        
-        # Add to FAISS index
+        # Add to index
         start_id = len(self._chunk_ids)
         self._index.add(embeddings)
         
@@ -137,30 +143,12 @@ class CodeIndexManager:
         self._update_stats()
 
     def _gpu_is_available(self) -> bool:
-        """Check if GPU FAISS support is available and GPUs are present."""
-        try:
-            if not hasattr(faiss, 'StandardGpuResources'):
-                return False
-            get_num_gpus = getattr(faiss, 'get_num_gpus', None)
-            if get_num_gpus is None:
-                return False
-            return get_num_gpus() > 0
-        except Exception:
-            return False
+        """Deprecated: retained for compatibility. Use vector backend selection."""
+        return False
 
     def _maybe_move_index_to_gpu(self) -> None:
-        """Move the current index to GPU if supported. No-op if already on GPU or unsupported."""
-        if self._index is None or self._on_gpu:
-            return
-        if not self._gpu_is_available():
-            return
-        try:
-            # Move index to all GPUs for faster add/search
-            self._index = faiss.index_cpu_to_all_gpus(self._index)
-            self._on_gpu = True
-            self._logger.info("FAISS index moved to GPU(s)")
-        except Exception as e:
-            self._logger.warning(f"Failed to move FAISS index to GPU, continuing on CPU: {e}")
+        """Deprecated: retained for compatibility. GPU handled in FAISS backend."""
+        return
     
     def search(
         self, 
@@ -183,10 +171,9 @@ class CodeIndexManager:
         logger.info(f"Index has {index.ntotal} total vectors")
         
         # Normalize query embedding
-        query_embedding = query_embedding.reshape(1, -1)
-        faiss.normalize_L2(query_embedding)
+        query_embedding = self._normalize_query(query_embedding)
         
-        # Search in FAISS index
+        # Search in index
         search_k = min(k * 3, index.ntotal)  # Get more results for filtering
         similarities, indices = index.search(query_embedding, search_k)
         
@@ -317,27 +304,18 @@ class CodeIndexManager:
         return len(chunks_to_remove)
     
     def save_index(self):
-        """Save the FAISS index and chunk IDs to disk."""
+        """Save the vector index and chunk IDs to disk."""
         if self._index is not None:
             try:
-                index_to_write = self._index
-                # If on GPU, convert to CPU before saving
-                if self._on_gpu and hasattr(faiss, 'index_gpu_to_cpu'):
-                    index_to_write = faiss.index_gpu_to_cpu(self._index)
-                faiss.write_index(index_to_write, str(self.index_path))
+                self._index.save(self.index_path)
                 self._logger.info(f"Saved index to {self.index_path}")
             except Exception as e:
-                self._logger.warning(f"Failed to save GPU index directly, attempting CPU fallback: {e}")
-                try:
-                    cpu_index = faiss.index_gpu_to_cpu(self._index)
-                    faiss.write_index(cpu_index, str(self.index_path))
-                    self._logger.info(f"Saved index to {self.index_path} (CPU fallback)")
-                except Exception as e2:
-                    self._logger.error(f"Failed to save FAISS index: {e2}")
+                self._logger.error(f"Failed to save index: {e}")
         
         # Save chunk IDs
         with open(self.chunk_id_path, 'wb') as f:
             pickle.dump(self._chunk_ids, f)
+        self._write_index_meta()
         
         self._update_stats()
     
@@ -347,7 +325,8 @@ class CodeIndexManager:
             'total_chunks': len(self._chunk_ids),
             'index_size': self._index.ntotal if self._index else 0,
             'embedding_dimension': self._index.d if self._index else 0,
-            'index_type': type(self._index).__name__ if self._index else 'None'
+            'index_type': self._index.index_type if self._index else 'None',
+            'vector_backend': self._backend_name if self._index else 'None'
         }
         
         # Add file and folder statistics
@@ -410,12 +389,10 @@ class CodeIndexManager:
     def clear_index(self):
         """Clear the entire index and metadata."""
         # Close database connection
-        if self._metadata_db is not None:
-            self._metadata_db.close()
-            self._metadata_db = None
+        self.close()
         
         # Remove files
-        for file_path in [self.index_path, self.metadata_path, self.chunk_id_path, self.stats_path]:
+        for file_path in [self.index_path, self.metadata_path, self.chunk_id_path, self.stats_path, self.index_meta_path]:
             if file_path.exists():
                 file_path.unlink()
         
@@ -427,5 +404,69 @@ class CodeIndexManager:
     
     def __del__(self):
         """Cleanup when object is destroyed."""
+        self.close()
+
+    def close(self):
+        """Close open resources."""
         if self._metadata_db is not None:
-            self._metadata_db.close()
+            try:
+                self._metadata_db.close()
+            except Exception:
+                pass
+            self._metadata_db = None
+
+    def _normalize_embeddings(self, embeddings: np.ndarray) -> np.ndarray:
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return (embeddings / norms).astype(np.float32, copy=False)
+
+    def _normalize_query(self, query: np.ndarray) -> np.ndarray:
+        query = np.asarray(query, dtype=np.float32)
+        if query.ndim == 1:
+            query = query.reshape(1, -1)
+        norms = np.linalg.norm(query, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return (query / norms).astype(np.float32, copy=False)
+
+    def _resolve_backend_for_existing_index(self) -> str:
+        if not self._backend_explicit:
+            meta_backend = self._read_index_meta_backend()
+            if meta_backend:
+                return meta_backend
+        return self._backend_name
+
+    def _read_index_meta_backend(self) -> Optional[str]:
+        if not self.index_meta_path.exists():
+            return None
+        try:
+            with open(self.index_meta_path, "r") as handle:
+                data = json.load(handle)
+            backend = data.get("backend")
+            return backend if backend in ("faiss", "mps") else None
+        except Exception:
+            return None
+
+    def _write_index_meta(self) -> None:
+        if not self._index:
+            return
+        meta = {
+            "backend": self._backend_name,
+            "index_type": self._index.index_type,
+            "embedding_dimension": self._index.d
+        }
+        try:
+            with open(self.index_meta_path, "w") as handle:
+                json.dump(meta, handle, indent=2)
+        except Exception as exc:
+            self._logger.warning(f"Failed to write index metadata: {exc}")
+
+    def _try_load_index(self, backend_name: str):
+        try:
+            if backend_name == "mps":
+                self._backend_name = "mps"
+                return MpsVectorIndex.load(self.index_path, device="mps")
+            self._backend_name = "faiss"
+            return FaissVectorIndex.load(self.index_path)
+        except Exception as exc:
+            self._logger.warning(f"Failed to load {backend_name} index: {exc}")
+            return None

@@ -147,7 +147,7 @@ Tests are organized by component with pytest markers:
 ### Key Dependencies
 
 - `sentence-transformers`: EmbeddingGemma model loading and inference
-- `faiss-cpu`: Efficient vector similarity search
+- `faiss-cpu`: Efficient vector similarity search (CPU backend)
 - `fastmcp`: MCP server implementation for Claude Code integration
 - `sqlitedict`: Persistent metadata storage
 - `tree-sitter` & `tree-sitter-languages`: Multi-language parsing support
@@ -165,6 +165,8 @@ Tests are organized by component with pytest markers:
 ### Environment Variables
 
 - `CODE_SEARCH_STORAGE`: Custom storage directory (default: `~/.claude_code_search`)
+- `CODE_SEARCH_VECTOR_BACKEND`: `auto` (default), `mps`, or `faiss`
+- `CODE_SEARCH_MPS_CHUNK_SIZE`: Chunk size for MPS search batches (default: `20000`)
 
 ## Common Tasks
 

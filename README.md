@@ -12,6 +12,18 @@ Forks the official [Claude Context Local](https://github.com/FarhanAliRaza/claud
 
 A decent GPU (or CPU as a fallback) with enough RAM (32GB+) to handle model context building. A small repository being indexed with an Apple M1 Max CPU took about 122 seconds as an example. You also need at least 500MB to download and install the embedding.
 
+### Apple Silicon notes
+
+- Embeddings run on PyTorch MPS automatically when available.
+- Vector search can use an MPS backend on Apple Silicon (default when available). Override with `CODE_SEARCH_VECTOR_BACKEND=faiss` if you want CPU-only search.
+- The MPS backend uses brute-force cosine similarity; very large indexes may still be faster with FAISS CPU/IVF.
+
+### Environment variables
+
+- `CODE_SEARCH_STORAGE`: Custom storage directory (default: `~/.claude_code_search`)
+- `CODE_SEARCH_VECTOR_BACKEND`: `auto` (default), `mps`, or `faiss`
+- `CODE_SEARCH_MPS_CHUNK_SIZE`: Chunk size for MPS search batches (default: `20000`)
+
 ## Installation
 
 Single-line installation script:
