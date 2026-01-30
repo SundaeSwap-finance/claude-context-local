@@ -5,6 +5,24 @@ set -euo pipefail
 # SundaeSwap fork using nomic-embed-text (no auth required)
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/SundaeSwap-finance/claude-context-local/main/scripts/install.sh | bash
+#   curl -fsSL ... | bash -s -- -b feature-branch
+#   ./install.sh --branch develop
+
+# Parse command line arguments
+BRANCH=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -b|--branch)
+      BRANCH="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [-b|--branch <branch-name>]"
+      exit 1
+      ;;
+  esac
+done
 
 REPO_URL="https://github.com/SundaeSwap-finance/claude-context-local"
 PROJECT_DIR="${HOME}/.local/share/claude-context-local"
@@ -15,6 +33,10 @@ print() { printf "%b\n" "$1"; }
 hr() { print "\n==================================================\n"; }
 
 hr; print "Installing Claude Context Local (SundaeSwap fork)"; hr
+
+if [[ -n "${BRANCH}" ]]; then
+  print "Using branch: ${BRANCH}"
+fi
 
 # 1) Ensure git is available
 if ! command -v git >/dev/null 2>&1; then
@@ -58,7 +80,11 @@ if [[ -d "${PROJECT_DIR}/.git" ]]; then
       d|D) 
         print "Removing ${PROJECT_DIR} for clean reinstall..."
         rm -rf "${PROJECT_DIR}"
-        git clone "${REPO_URL}" "${PROJECT_DIR}"
+        if [[ -n "${BRANCH}" ]]; then
+          git clone --branch "${BRANCH}" "${REPO_URL}" "${PROJECT_DIR}"
+        else
+          git clone "${REPO_URL}" "${PROJECT_DIR}"
+        fi
         IS_UPDATE=0
         ;;
       u|U|*)
@@ -66,7 +92,12 @@ if [[ -d "${PROJECT_DIR}/.git" ]]; then
         git -C "${PROJECT_DIR}" stash push -m "Auto-stash before installer update $(date)"
         git -C "${PROJECT_DIR}" remote set-url origin "${REPO_URL}"
         git -C "${PROJECT_DIR}" fetch --tags --prune
-        git -C "${PROJECT_DIR}" pull --ff-only
+        if [[ -n "${BRANCH}" ]]; then
+          git -C "${PROJECT_DIR}" checkout "${BRANCH}"
+          git -C "${PROJECT_DIR}" pull --ff-only
+        else
+          git -C "${PROJECT_DIR}" pull --ff-only
+        fi
         print "Your changes are stashed. Run 'git stash pop' in ${PROJECT_DIR} to restore them."
         ;;
     esac
@@ -74,11 +105,20 @@ if [[ -d "${PROJECT_DIR}/.git" ]]; then
     print "Updating repository..."
     git -C "${PROJECT_DIR}" remote set-url origin "${REPO_URL}"
     git -C "${PROJECT_DIR}" fetch --tags --prune
-    git -C "${PROJECT_DIR}" pull --ff-only
+    if [[ -n "${BRANCH}" ]]; then
+      git -C "${PROJECT_DIR}" checkout "${BRANCH}"
+      git -C "${PROJECT_DIR}" pull --ff-only
+    else
+      git -C "${PROJECT_DIR}" pull --ff-only
+    fi
   fi
 else
   print "Cloning ${REPO_URL} to ${PROJECT_DIR}"
-  git clone "${REPO_URL}" "${PROJECT_DIR}"
+  if [[ -n "${BRANCH}" ]]; then
+    git clone --branch "${BRANCH}" "${REPO_URL}" "${PROJECT_DIR}"
+  else
+    git clone "${REPO_URL}" "${PROJECT_DIR}"
+  fi
   IS_UPDATE=0
 fi
 
