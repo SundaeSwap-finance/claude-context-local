@@ -93,8 +93,7 @@ if [[ -d "${PROJECT_DIR}/.git" ]]; then
         git -C "${PROJECT_DIR}" remote set-url origin "${REPO_URL}"
         git -C "${PROJECT_DIR}" fetch --tags --prune
         if [[ -n "${BRANCH}" ]]; then
-          git -C "${PROJECT_DIR}" checkout "${BRANCH}"
-          git -C "${PROJECT_DIR}" pull --ff-only
+          git -C "${PROJECT_DIR}" checkout -B "${BRANCH}" "origin/${BRANCH}"
         else
           git -C "${PROJECT_DIR}" pull --ff-only
         fi
@@ -106,8 +105,7 @@ if [[ -d "${PROJECT_DIR}/.git" ]]; then
     git -C "${PROJECT_DIR}" remote set-url origin "${REPO_URL}"
     git -C "${PROJECT_DIR}" fetch --tags --prune
     if [[ -n "${BRANCH}" ]]; then
-      git -C "${PROJECT_DIR}" checkout "${BRANCH}"
-      git -C "${PROJECT_DIR}" pull --ff-only
+      git -C "${PROJECT_DIR}" checkout -B "${BRANCH}" "origin/${BRANCH}"
     else
       git -C "${PROJECT_DIR}" pull --ff-only
     fi
