@@ -165,8 +165,11 @@ Tests are organized by component with pytest markers:
 ### Environment Variables
 
 - `CODE_SEARCH_STORAGE`: Custom storage directory (default: `~/.claude_code_search`)
-- `CODE_SEARCH_VECTOR_BACKEND`: `auto` (default), `mps`, or `faiss`
+- `CODE_SEARCH_VECTOR_BACKEND`: `auto` (default), `mps`, or `faiss` - controls vector search backend
+- `CODE_SEARCH_EMBEDDING_DEVICE`: `auto` (default=CPU), `cpu`, `cuda`, or `mps` - controls embedding model device
 - `CODE_SEARCH_MPS_CHUNK_SIZE`: Chunk size for MPS search batches (default: `20000`)
+
+**Note on Apple Silicon (MPS):** Embedding generation defaults to CPU even on Apple Silicon because PyTorch's MPS backend has known instability issues with transformer attention operations (`scaled_dot_product_attention`). The vector search backend can still use MPS safely. To explicitly try MPS for embeddings (not recommended), set `CODE_SEARCH_EMBEDDING_DEVICE=mps`.
 
 ## Common Tasks
 
