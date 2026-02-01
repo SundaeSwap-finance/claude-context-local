@@ -195,7 +195,7 @@ class IncrementalIndexer:
             # Filter supported files
             supported_files = [f for f in all_files if self.chunker.is_supported(f)]
             
-            # Collect all chunks first, then embed in a single pass for efficiency
+            # Collect all chunks first
             all_chunks = []
             for file_path in supported_files:
                 full_path = Path(project_path) / file_path
@@ -206,21 +206,39 @@ class IncrementalIndexer:
                 except Exception as e:
                     logger.warning(f"Failed to chunk {file_path}: {e}")
 
-            # Embed all chunks in one batched call
+            # Embed chunks in batches to avoid memory issues
             all_embedding_results = []
             if all_chunks:
-                try:
-                    all_embedding_results = self.embedder.embed_chunks(all_chunks)
-                    # Update metadata
-                    for chunk, embedding_result in zip(all_chunks, all_embedding_results):
-                        embedding_result.metadata['project_name'] = project_name
-                        embedding_result.metadata['content'] = chunk.content
-                except Exception as e:
-                    logger.warning(f"Embedding failed: {e}")
-            
-            # Add all embeddings to index at once
-            if all_embedding_results:
-                self.indexer.add_embeddings(all_embedding_results)
+                # Process in larger batches to handle big repositories
+                batch_size = 500  # Process 500 chunks at a time for better memory safety
+                total_batches = (len(all_chunks) + batch_size - 1) // batch_size
+                logger.info(f"Processing {len(all_chunks)} chunks in batches of {batch_size}")
+                
+                for i in range(0, len(all_chunks), batch_size):
+                    batch = all_chunks[i:i + batch_size]
+                    batch_num = i // batch_size + 1
+                    
+                    try:
+                        # Use smaller batch size for embedding to avoid OOM on MPS
+                        # Reduced to 4 for better memory safety on Apple Silicon
+                        embedding_batch_size = 4
+                        batch_results = self.embedder.embed_chunks(batch, batch_size=embedding_batch_size)
+                        
+                        # Update metadata
+                        for chunk, embedding_result in zip(batch, batch_results):
+                            embedding_result.metadata['project_name'] = project_name
+                            embedding_result.metadata['content'] = chunk.content
+                        
+                        all_embedding_results.extend(batch_results)
+                        
+                        # Add batch to index immediately to free memory
+                        self.indexer.add_embeddings(batch_results)
+                        
+                        logger.info(f"Embedded batch {batch_num}/{total_batches} ({len(batch)} chunks)")
+                    except Exception as e:
+                        logger.error(f"Failed to embed batch {batch_num}/{total_batches}: {e}")
+                        # Continue with next batch instead of failing completely
+                        continue
             
             chunks_added = len(all_embedding_results)
             
@@ -301,7 +319,7 @@ class IncrementalIndexer:
         # Filter supported files
         supported_files = [f for f in files_to_index if self.chunker.is_supported(f)]
         
-        # Collect all chunks first, then embed in a single pass
+        # Collect all chunks first
         chunks_to_embed = []
         for file_path in supported_files:
             full_path = Path(project_path) / file_path
@@ -312,20 +330,39 @@ class IncrementalIndexer:
             except Exception as e:
                 logger.warning(f"Failed to chunk {file_path}: {e}")
 
+        # Embed chunks in batches to avoid memory issues
         all_embedding_results = []
         if chunks_to_embed:
-            try:
-                all_embedding_results = self.embedder.embed_chunks(chunks_to_embed)
-                # Update metadata
-                for chunk, embedding_result in zip(chunks_to_embed, all_embedding_results):
-                    embedding_result.metadata['project_name'] = project_name
-                    embedding_result.metadata['content'] = chunk.content
-            except Exception as e:
-                logger.warning(f"Embedding failed: {e}")
-        
-        # Add all embeddings to index at once
-        if all_embedding_results:
-            self.indexer.add_embeddings(all_embedding_results)
+            # Process in larger batches to handle big repositories
+            batch_size = 500  # Process 500 chunks at a time for better memory safety
+            total_batches = (len(chunks_to_embed) + batch_size - 1) // batch_size
+            logger.info(f"Processing {len(chunks_to_embed)} chunks in batches of {batch_size}")
+            
+            for i in range(0, len(chunks_to_embed), batch_size):
+                batch = chunks_to_embed[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                
+                try:
+                    # Use smaller batch size for embedding to avoid OOM on MPS
+                    # Reduced to 4 for better memory safety on Apple Silicon
+                    embedding_batch_size = 4
+                    batch_results = self.embedder.embed_chunks(batch, batch_size=embedding_batch_size)
+                    
+                    # Update metadata
+                    for chunk, embedding_result in zip(batch, batch_results):
+                        embedding_result.metadata['project_name'] = project_name
+                        embedding_result.metadata['content'] = chunk.content
+                    
+                    all_embedding_results.extend(batch_results)
+                    
+                    # Add batch to index immediately to free memory
+                    self.indexer.add_embeddings(batch_results)
+                    
+                    logger.info(f"Embedded batch {batch_num}/{total_batches} ({len(batch)} chunks)")
+                except Exception as e:
+                    logger.error(f"Failed to embed batch {batch_num}/{total_batches}: {e}")
+                    # Continue with next batch instead of failing completely
+                    continue
         
         return len(all_embedding_results)
     

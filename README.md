@@ -2,6 +2,12 @@
 
 Forks the official [Claude Context Local](https://github.com/FarhanAliRaza/claude-context-local) repository and switches out EmbeddingGemma (which requires account and registration) for an open-source alternative: [nomic-embed-text-v1](https://huggingface.co/nomic-ai/nomic-embed-text-v1).
 
+## How it works
+
+- Uses an ML model (nomic-embed-text) to convert code into 768-dimensional vectors
+- Stores vectors in FAISS for fast similarity search
+- Requires indexing the codebase upfront (processes files, generates embeddings, stores them)
+
 ## Motivation
 
 - Token usage (not API calls directly) - by returning targeted snippets instead of full files

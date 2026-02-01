@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
+import os
 import numpy as np
 import torch
 
@@ -49,22 +50,35 @@ class EmbeddingModel(ABC):
             pass
 
     def _resolve_device(self, requested: Optional[str]) -> str:
-        """Resolve device string."""
-        req = (requested or "auto").lower()
+        """Resolve device string.
+
+        Note: MPS (Apple Silicon GPU) has known instability issues with
+        transformer attention operations (scaled_dot_product_attention crashes).
+        By default, we use CPU for embeddings even on Apple Silicon for stability.
+        Set CODE_SEARCH_EMBEDDING_DEVICE=mps to explicitly use MPS if desired.
+        """
+        # Check for explicit embedding device override
+        env_device = os.getenv("CODE_SEARCH_EMBEDDING_DEVICE", "").strip().lower()
+        if env_device:
+            req = env_device
+        else:
+            req = (requested or "auto").lower()
+
         if req in ("auto", "none", ""):
             if torch.cuda.is_available():
                 return "cuda"
-            try:
-                if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-                    return "mps"
-            except Exception:
-                pass
+            # NOTE: Intentionally NOT auto-selecting MPS for embeddings.
+            # PyTorch MPS has instability issues with transformer attention
+            # (scaled_dot_product_attention) that cause Metal assertion failures.
+            # Users can explicitly set CODE_SEARCH_EMBEDDING_DEVICE=mps to try it.
             return "cpu"
         if req.startswith("cuda"):
             return "cuda" if torch.cuda.is_available() else "cpu"
         if req == "mps":
             try:
-                return "mps" if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else "cpu"
+                if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                    return "mps"
+                return "cpu"
             except Exception:
                 return "cpu"
         return "cpu"
